@@ -30,6 +30,8 @@ o	Reporting Service
 o	Barcode Scanner API
 o	Email/SMS Alert Service
  
+ ![image](https://github.com/user-attachments/assets/05733507-8946-4bc6-9ff8-440f94bad284)
+
 erDiagram
     USER ||--o{ PRODUCT : creates
     USER ||--o{ SUPPLIER : manages
