@@ -604,3 +604,556 @@ Headers:
 Authorization: Bearer <your_token>
 
 
+
+
+
+
+
+
+
+
+
+
+
+Milestone Four Project: Development – Frontend Implementation
+Objective:
+Start implementing the core functionalities of the application, focusing on the frontend.
+Frontend Development
+Create React App
+o	npx create-react-app smartstock-frontend
+o	cd smartstock-frontend
+
+Install Dependencies
+o	npm install @mui/material @emotion/react @emotion/styled @mui/icons-material axios react-router-dom formik yup
+
+File Structure
+smartstock-frontend/
+├── public/
+├── src/
+│   ├── components/
+│   │   ├── Layout/
+│   │   │   ├── Navbar.jsx
+│   │   │   └── Sidebar.jsx
+│   │   ├── Products/
+│   │   │   ├── ProductList.jsx
+│   │   │   ├── ProductForm.jsx
+│   │   │   └── ProductCard.jsx
+│   │   ├── Inventory/
+│   │   │   └── AdjustInventory.jsx
+│   │   └── common/
+│   │       ├── Alert.jsx
+│   │       └── Loading.jsx
+│   ├── pages/
+│   │   ├── Login.jsx
+│   │   ├── Dashboard.jsx
+│   │   ├── Products.jsx
+│   │   ├── Inventory.jsx
+│   │   └── Reports.jsx
+│   ├── services/
+│   │   ├── api.js
+│   │   └── auth.js
+│   ├── App.js
+│   ├── index.js
+│   └── theme.js
+├── .env
+└── package.json
+
+Configure API Service
+Create API service
+import axios from 'axios';
+const api = axios.create({
+  baseURL: process.env.REACT_APP_API_URL || 'http://localhost:3000',
+});
+
+api.interceptors.request.use((config) => {
+  const token = localStorage.getItem('token');
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+  return config;
+});
+
+export default api;
+
+Create auth service
+import api from './api';
+export const login = async (email, password) => {
+  try {
+    const response = await api.post('/auth/login', { email, password });
+    localStorage.setItem('token', response.data.token);
+    return response.data.user;
+  } catch (error) {
+    throw error.response?.data?.error || 'Login failed';
+  }
+};
+export const logout = () => {
+  localStorage.removeItem('token');
+};
+
+Implement Authentication
+Create Login Page
+import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { Button, TextField, Container, Typography, Box } from '@mui/material';
+import { login } from '../services/auth';
+const Login = () => {
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
+  const navigate = useNavigate();
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    try {
+      await login(email, password);
+      navigate('/dashboard');
+    } catch (err) {
+      setError(err);
+    }
+  };
+
+  return (
+    <Container maxWidth="xs">
+      <Box sx={{ mt: 8, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+        <Typography component="h1" variant="h5">
+          SmartStock Login
+        </Typography>
+        {error && (
+          <Typography color="error" sx={{ mt: 2 }}>
+            {error}
+          </Typography>
+        )}
+        <Box component="form" onSubmit={handleSubmit} sx={{ mt: 1 }}>
+          <TextField
+            margin="normal"
+            required
+            fullWidth
+            label="Email"
+            autoComplete="email"
+            autoFocus
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+          />
+          <TextField
+            margin="normal"
+            required
+            fullWidth
+            label="Password"
+            type="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+          />
+          <Button
+            type="submit"
+            fullWidth
+            variant="contained"
+            sx={{ mt: 3, mb: 2 }}
+          >
+            Sign In
+          </Button>
+        </Box>
+      </Box>
+    </Container>
+  );
+};
+
+export default Login;
+
+Create Protected Route Component
+import { Navigate } from 'react-router-dom';
+const ProtectedRoute = ({ children }) => {
+  const token = localStorage.getItem('token');
+  
+  if (!token) {
+    return <Navigate to="/login" replace />;
+  }
+
+  return children;
+};
+
+export default ProtectedRoute;
+
+
+Build Main Layout
+Create Navbar
+
+import { AppBar, Toolbar, Typography, Button } from '@mui/material';
+import { logout } from '../../services/auth';
+import { useNavigate } from 'react-router-dom';
+const Navbar = () => {
+  const navigate = useNavigate();
+
+  const handleLogout = () => {
+    logout();
+    navigate('/login');
+  };
+
+  return (
+    <AppBar position="static">
+      <Toolbar>
+        <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
+          SmartStock
+        </Typography>
+        <Button color="inherit" onClick={handleLogout}>
+          Logout
+        </Button>
+      </Toolbar>
+    </AppBar>
+  );
+};
+
+export default Navbar;
+
+Create Sidebar
+import { Drawer, List, ListItem, ListItemIcon, ListItemText } from '@mui/material';
+import { Inventory, ListAlt, Report, Dashboard } from '@mui/icons-material';
+import { Link } from 'react-router-dom';
+
+const Sidebar = () => {
+  const menuItems = [
+    { text: 'Dashboard', icon: <Dashboard />, path: '/dashboard' },
+    { text: 'Products', icon: <ListAlt />, path: '/products' },
+    { text: 'Inventory', icon: <Inventory />, path: '/inventory' },
+    { text: 'Reports', icon: <Report />, path: '/reports' },
+  ];
+
+  return (
+    <Drawer variant="permanent" anchor="left">
+      <List>
+        {menuItems.map((item) => (
+          <ListItem button key={item.text} component={Link} to={item.path}>
+            <ListItemIcon>{item.icon}</ListItemIcon>
+            <ListItemText primary={item.text} />
+          </ListItem>
+        ))}
+      </List>
+    </Drawer>
+  );
+};
+
+export default Sidebar;
+
+Implement Product Management
+Create Product List Page
+
+import { useEffect, useState } from 'react';
+import { Box, Button, Container, Typography } from '@mui/material';
+import { Link } from 'react-router-dom';
+import api from '../services/api';
+import ProductList from '../components/Products/ProductList';
+const Products = () => {
+  const [products, setProducts] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    const fetchProducts = async () => {
+      try {
+        const response = await api.get('/products');
+        setProducts(response.data.data);
+      } catch (err) {
+        setError('Failed to fetch products');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchProducts();
+  }, []);
+
+  if (loading) return <Typography>Loading...</Typography>;
+  if (error) return <Typography color="error">{error}</Typography>;
+
+  return (
+    <Container>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 2 }}>
+        <Typography variant="h4">Products</Typography>
+        <Button variant="contained" component={Link} to="/products/new">
+          Add Product
+        </Button>
+      </Box>
+      <ProductList products={products} />
+    </Container>
+  );
+};
+
+export default Products;
+
+Create Product Form
+import { useState, useEffect } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
+import { TextField, Button, Box, Typography, MenuItem } from '@mui/material';
+import { Formik } from 'formik';
+import * as Yup from 'yup';
+import api from '../../services/api';
+
+const ProductForm = () => {
+  const { id } = useParams();
+  const navigate = useNavigate();
+  const [suppliers, setSuppliers] = useState([]);
+  const [isEdit, setIsEdit] = useState(false);
+
+  useEffect(() => {
+    const fetchSuppliers = async () => {
+      const response = await api.get('/suppliers');
+      setSuppliers(response.data);
+    };
+
+    fetchSuppliers();
+
+    if (id) {
+      setIsEdit(true);
+      // Fetch product data if editing
+    }
+  }, [id]);
+
+  const validationSchema = Yup.object().shape({
+    name: Yup.string().required('Required'),
+    sku: Yup.string().required('Required'),
+    category: Yup.string().required('Required'),
+    initialStock: Yup.number().min(0, 'Must be positive').required('Required'),
+    lowStockThreshold: Yup.number().min(0, 'Must be positive').required('Required'),
+    supplierId: Yup.string().required('Required'),
+  });
+
+  const handleSubmit = async (values) => {
+    try {
+      if (isEdit) {
+        await api.put(`/products/${id}`, values);
+      } else {
+        await api.post('/products', values);
+      }
+      navigate('/products');
+    } catch (error) {
+      console.error('Error saving product:', error);
+    }
+  };
+
+  return (
+    <Box sx={{ p: 3 }}>
+      <Typography variant="h5" gutterBottom>
+        {isEdit ? 'Edit Product' : 'Add New Product'}
+      </Typography>
+      <Formik
+        initialValues={{
+          name: '',
+          sku: '',
+          category: '',
+          initialStock: 0,
+          lowStockThreshold: 5,
+          expiryDate: '',
+          supplierId: '',
+        }}
+        validationSchema={validationSchema}
+        onSubmit={handleSubmit}
+      >
+        {({ values, errors, touched, handleChange, handleSubmit }) => (
+          <form onSubmit={handleSubmit}>
+            <TextField
+              fullWidth
+              margin="normal"
+              label="Product Name"
+              name="name"
+              value={values.name}
+              onChange={handleChange}
+              error={touched.name && Boolean(errors.name)}
+              helperText={touched.name && errors.name}
+            />
+            {/* Add other form fields similarly */}
+            <Button type="submit" variant="contained" sx={{ mt: 2 }}>
+              Save
+            </Button>
+          </form>
+        )}
+      </Formik>
+    </Box>
+  );
+};
+
+export default ProductForm;
+
+Connect to Backend API
+Update App.js
+
+import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { CssBaseline, ThemeProvider } from '@mui/material';
+import theme from './theme';
+import Navbar from './components/Layout/Navbar';
+import Sidebar from './components/Layout/Sidebar';
+import Login from './pages/Login';
+import Dashboard from './pages/Dashboard';
+import Products from './pages/Products';
+import Inventory from './pages/Inventory';
+import Reports from './pages/Reports';
+import ProtectedRoute from './components/common/ProtectedRoute';
+const App = () => {
+  return (
+    <ThemeProvider theme={theme}>
+      <CssBaseline />
+      <BrowserRouter>
+        <Routes>
+          <Route path="/login" element={<Login />} />
+          <Route
+            path="/*"
+            element={
+              <ProtectedRoute>
+                <Navbar />
+                <Box sx={{ display: 'flex' }}>
+                  <Sidebar />
+                  <Box component="main" sx={{ flexGrow: 1, p: 3 }}>
+                    <Routes>
+                      <Route path="/dashboard" element={<Dashboard />} />
+                      <Route path="/products" element={<Products />} />
+                      <Route path="/products/new" element={<ProductForm />} />
+                      <Route path="/products/:id" element={<ProductForm />} />
+                      <Route path="/inventory" element={<Inventory />} />
+                      <Route path="/reports" element={<Reports />} />
+                    </Routes>
+                  </Box>
+                </Box>
+              </ProtectedRoute>
+            }
+          />
+        </Routes>
+      </BrowserRouter>
+    </ThemeProvider>
+  );
+};
+
+export default App;
+
+Implement Inventory Adjustment
+Create Inventory Adjustment Component
+
+import { useState } from 'react';
+import { TextField, Button, Box, Typography, MenuItem } from '@mui/material';
+import api from '../../services/api';
+
+const AdjustInventory = ({ productId }) => {
+  const [adjustment, setAdjustment] = useState(0);
+  const [reason, setReason] = useState('adjustment');
+  const [message, setMessage] = useState('');
+const handleSubmit = async () => {
+    try {
+      await api.patch(`/inventory/${productId}/adjust`, { adjustment, reason });
+      setMessage('Inventory adjusted successfully');
+    } catch (error) {
+      setMessage('Failed to adjust inventory');
+    }
+  };
+
+  return (
+    <Box sx={{ p: 2 }}>
+      <Typography variant="h6">Adjust Inventory</Typography>
+      <TextField
+        label="Adjustment"
+        type="number"
+        value={adjustment}
+        onChange={(e) => setAdjustment(Number(e.target.value))}
+        fullWidth
+        margin="normal"
+      />
+      <TextField
+        select
+        label="Reason"
+        value={reason}
+        onChange={(e) => setReason(e.target.value)}
+        fullWidth
+        margin="normal"
+      >
+        <MenuItem value="purchase">Purchase</MenuItem>
+        <MenuItem value="sale">Sale</MenuItem>
+        <MenuItem value="adjustment">Adjustment</MenuItem>
+        <MenuItem value="return">Return</MenuItem>
+      </TextField>
+      <Button variant="contained" onClick={handleSubmit} sx={{ mt: 2 }}>
+        Submit
+      </Button>
+      {message && (
+        <Typography sx={{ mt: 2 }} color={message.includes('success') ? 'success' : 'error'}>
+          {message}
+        </Typography>
+      )}
+    </Box>
+  );
+};
+
+export default AdjustInventory;
+
+Display Reports
+Create Reports Page
+
+import { useState, useEffect } from 'react';
+import { Box, Typography, Paper, Table, TableBody, TableCell, TableContainer, TableHead, TableRow } from '@mui/material';
+import api from '../services/api';
+
+const Reports = () => {
+  const [expiryAlerts, setExpiryAlerts] = useState({ critical: [], warning: [] });
+  const [stockLevels, setStockLevels] = useState({ lowStock: [], outOfStock: [] });
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const expiryResponse = await api.get('/reports/expiry-alerts');
+        setExpiryAlerts(expiryResponse.data);
+        
+        const stockResponse = await api.get('/reports/stock-levels');
+        setStockLevels(stockResponse.data);
+      } catch (error) {
+        console.error('Error fetching reports:', error);
+      }
+    };
+
+    fetchData();
+  }, []);
+
+  return (
+    <Box sx={{ p: 3 }}>
+      <Typography variant="h4" gutterBottom>
+        Reports
+      </Typography>
+      
+      <Typography variant="h5" sx={{ mt: 3 }}>Expiry Alerts</Typography>
+      <Box sx={{ display: 'flex', gap: 2, mt: 2 }}>
+        <Paper sx={{ p: 2, flex: 1 }}>
+          <Typography variant="h6" color="error">Critical ({expiryAlerts.critical.length})</Typography>
+          <TableContainer>
+            <Table>
+              <TableHead>
+                <TableRow>
+                  <TableCell>Product</TableCell>
+                  <TableCell>Days Until Expiry</TableCell>
+                  <TableCell>Current Stock</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {expiryAlerts.critical.map((item, index) => (
+                  <TableRow key={index}>
+                    <TableCell>{item.product}</TableCell>
+                    <TableCell>{item.daysUntilExpiry}</TableCell>
+                    <TableCell>{item.currentStock}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </TableContainer>
+        </Paper>
+        
+        <Paper sx={{ p: 2, flex: 1 }}>
+          <Typography variant="h6" color="warning.main">Warning ({expiryAlerts.warning.length})</Typography>
+          {/* Similar table for warning items */}
+        </Paper>
+      </Box>
+
+      <Typography variant="h5" sx={{ mt: 4 }}>Stock Levels</Typography>
+      {/* Similar tables for low stock and out of stock items */}
+    </Box>
+  );
+};
+
+export default Reports;
+
+Final Steps: Create .env file
+o	REACT_APP_API_URL=http://localhost:3000
+o	npm start
+
