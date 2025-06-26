@@ -86,10 +86,19 @@ o	Barcode Scanner API
 o	Email/SMS Alert Service
 
 
+![image](https://github.com/user-attachments/assets/7d7624f0-104a-4c5e-9548-01a6e2b24c1c)
+![image](https://github.com/user-attachments/assets/7d7624f0-104a-4c5e-9548-01a6e2b24c1c)
+
+
  
 Database Schema Design
 o	Define the necessary tables, relationships, and entities for the app.
 o	Create ER diagrams (entity-relationship) and discuss CRUD operations.
+
+![image](https://github.com/user-attachments/assets/43d3ea63-6db1-41f1-8040-b1b619b0188f)
+![image](https://github.com/user-attachments/assets/43d3ea63-6db1-41f1-8040-b1b619b0188f)
+
+
 
  
 erDiagram
