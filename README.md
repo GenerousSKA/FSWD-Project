@@ -200,3 +200,407 @@ GET /reports/expiry-alerts
   "warning": []
 }
 
+
+
+
+
+
+Milestone Three Project: Development – Backend Implementation
+
+Objective:
+Start implementing the core functionalities of the application, focusing on backend development first.
+
+Node.js installed (version 18 or higher)
+MongoDB Atlas account (free tier is sufficient)
+Postman installed for API testing
+
+Set Up the Backend Server
+o	mkdir smartstock-backend
+o	cd smartstock-backend
+o	npm init -y
+o	npm install express mongoose jsonwebtoken bcryptjs cors dotenv
+o	npm install --save-dev nodemon
+
+Create basic file structure
+/smartstock-backend
+  ├── /src
+  │   ├── /config
+  │   ├── /controllers
+  │   ├── /models
+  │   ├── /routes
+  │   ├── /middleware
+  │   ├── app.js
+  │   └── server.js
+  ├── .env
+  └── package.json
+
+Set up the basic Express server
+const app = require('./app');
+const PORT = process.env.PORT || 3000;
+
+app.listen(PORT, () => {
+  console.log(`Server running on port ${PORT}`);
+});
+
+const express = require('express');
+const cors = require('cors');
+const app = express();
+
+app.use(cors());
+app.use(express.json());
+
+app.get('/', (req, res) => {
+  res.send('SmartStock Backend is running!');
+});
+module.exports = app;
+
+Integrate MongoDB Database
+Set up MongoDB Atlas
+o	Go to MongoDB Atlas
+o	Create a free account if you don't have one
+o	Create a new cluster
+o	Create a database user with read/write permissions
+o	Whitelist your IP address (or use 0.0.0.0/0 for development)
+o	Get your connection string
+
+Configure database connection
+o	MONGODB_URI=your_mongodb_connection_string
+o	JWT_SECRET=your_random_secret_key
+
+const mongoose = require('mongoose');
+require('dotenv').config();
+const connectDB = async () => {
+  try {
+    await mongoose.connect(process.env.MONGODB_URI);
+    console.log('MongoDB connected successfully');
+  } catch (error) {
+    console.error('MongoDB connection error:', error);
+    process.exit(1);
+  }
+};
+module.exports = connectDB;
+Update server.js to connect to MongoDB:
+
+const connectDB = require('./config/db');
+const app = require('./app');
+const PORT = process.env.PORT || 3000;
+
+connectDB();
+
+app.listen(PORT, () => {
+  console.log(`Server running on port ${PORT}`);
+});
+
+Create Database Models
+const mongoose = require('mongoose');
+const bcrypt = require('bcryptjs');
+
+const userSchema = new mongoose.Schema({
+  email: { type: String, required: true, unique: true },
+  passwordHash: { type: String, required: true },
+  role: { type: String, enum: ['admin', 'manager', 'staff'], required: true }
+});
+
+userSchema.pre('save', async function(next) {
+  if (this.isModified('passwordHash')) {
+    this.passwordHash = await bcrypt.hash(this.passwordHash, 10);
+  }
+  next();
+});
+
+module.exports = mongoose.model('User', userSchema);
+
+const mongoose = require('mongoose');
+const supplierSchema = new mongoose.Schema({
+  name: { type: String, required: true },
+  contactEmail: { type: String, required: true },
+  phone: { type: String, required: true }
+});
+module.exports = mongoose.model('Supplier', supplierSchema);
+const mongoose = require('mongoose');
+
+const productSchema = new mongoose.Schema({
+  name: { type: String, required: true },
+  sku: { type: String, required: true, unique: true },
+  category: { type: String, required: true },
+  currentStock: { type: Number, required: true, min: 0 },
+  lowStockThreshold: { type: Number, required: true, min: 0 },
+  expiryDate: { type: Date },
+  supplierId: { 
+    type: mongoose.Schema.Types.ObjectId, 
+    ref: 'Supplier', 
+    required: true 
+  }
+});
+
+module.exports = mongoose.model('Product', productSchema);
+
+const mongoose = require('mongoose');
+const stockMovementSchema = new mongoose.Schema({
+  productId: { 
+    type: mongoose.Schema.Types.ObjectId, 
+    ref: 'Product', 
+    required: true 
+  },
+  quantity: { type: Number, required: true },
+  movementType: { 
+    type: String, 
+    enum: ['purchase', 'sale', 'adjustment', 'return'], 
+    required: true 
+  },
+  timestamp: { type: Date, default: Date.now }
+});
+module.exports = mongoose.model('StockMovement', stockMovementSchema);
+
+Implement API Routes
+Set up authentication middleware
+const jwt = require('jsonwebtoken');
+const User = require('../models/User');
+
+const auth = async (req, res, next) => {
+  try {
+    const token = req.header('Authorization').replace('Bearer ', '');
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const user = await User.findById(decoded.userId);
+
+    if (!user) {
+      throw new Error();
+    }
+
+    req.user = user;
+    next();
+  } catch (error) {
+    res.status(401).send({ error: 'Please authenticate.' });
+  }
+};
+module.exports = auth;
+
+Create authentication routes
+const express = require('express');
+const router = express.Router();
+const jwt = require('jsonwebtoken');
+const User = require('../models/User');
+
+router.post('/login', async (req, res) => {
+  try {
+    const { email, password } = req.body;
+    const user = await User.findOne({ email });
+
+    if (!user || !(await user.comparePassword(password))) {
+      return res.status(401).json({ error: 'Invalid credentials' });
+    }
+const token = jwt.sign(
+      { userId: user._id, role: user.role },
+      process.env.JWT_SECRET,
+      { expiresIn: '24h' }
+    );
+
+    res.json({ token });
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
+module.exports = router;
+
+Create product routes
+const express = require('express');
+const router = express.Router();
+const Product = require('../models/Product');
+const auth = require('../middleware/auth');
+router.get('/', auth, async (req, res) => {
+  try {
+    const products = await Product.find().populate('supplierId', 'name contactEmail');
+    res.json({ data: products });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+router.post('/', auth, async (req, res) => {
+  try {
+    const { name, sku, initialStock, ...rest } = req.body;
+    const product = new Product({
+      name,
+      sku,
+      currentStock: initialStock,
+      ...rest
+    });
+    
+    await product.save();
+    res.status(201).json(product);
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
+module.exports = router;
+
+Create inventory routes
+
+const express = require('express');
+const router = express.Router();
+const Product = require('../models/Product');
+const StockMovement = require('../models/StockMovement');
+const auth = require('../middleware/auth');
+
+router.patch('/:productId/adjust', auth, async (req, res) => {
+  try {
+    const { adjustment, reason } = req.body;
+    const product = await Product.findById(req.params.productId);
+
+    if (!product) {
+      return res.status(404).json({ error: 'Product not found' });
+    }
+
+    product.currentStock += adjustment;
+    if (product.currentStock < 0) {
+      return res.status(400).json({ error: 'Insufficient stock' });
+    }
+
+    const movement = new StockMovement({
+      productId: product._id,
+      quantity: Math.abs(adjustment),
+      movementType: reason === 'sale' ? 'sale' : 'adjustment'
+    });
+
+    await Promise.all([product.save(), movement.save()]);
+    res.json({ 
+      message: 'Inventory adjusted successfully',
+      currentStock: product.currentStock
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+module.exports = router;
+
+Create reporting routes
+const express = require('express');
+const router = express.Router();
+const Product = require('../models/Product');
+const auth = require('../middleware/auth');
+
+router.get('/expiry-alerts', auth, async (req, res) => {
+  try {
+    const products = await Product.find({ expiryDate: { $exists: true } });
+    const today = new Date();
+    const critical = [];
+    const warning = [];
+     products.forEach(product => {
+      const expiryDate = new Date(product.expiryDate);
+      const daysUntilExpiry = Math.ceil((expiryDate - today) / (1000 * 60 * 60 * 24));
+      
+      if (daysUntilExpiry <= 7) {
+        const entry = {
+          product: product.name,
+          daysUntilExpiry,
+          currentStock: product.currentStock
+        };
+        
+        if (daysUntilExpiry <= 3) {
+          critical.push(entry);
+        } else {
+          warning.push(entry);
+        }
+      }
+    });
+    
+    res.json({ critical, warning });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+module.exports = router;
+
+Register all routes in app.js
+const express = require('express');
+const cors = require('cors');
+const authRoutes = require('./routes/auth');
+const productRoutes = require('./routes/products');
+const inventoryRoutes = require('./routes/inventory');
+const reportRoutes = require('./routes/reports');
+const app = express();
+
+app.use(cors());
+app.use(express.json());
+
+app.use('/auth', authRoutes);
+app.use('/products', productRoutes);
+app.use('/inventory', inventoryRoutes);
+app.use('/reports', reportRoutes);
+app.get('/', (req, res) => {
+  res.send('SmartStock Backend is running!');
+});
+module.exports = app;
+
+
+Testing API with Postman
+
+Creating a test user
+o	create a user in MongoDB:
+
+{
+  "email": "admin@smartstock.com",
+  "passwordHash": "plaintextpassword", // This will be hashed automatically
+  "role": "admin"
+}
+
+Test the authentication flow
+Login Request
+Method: POST
+URL: http://localhost:3000/auth/login
+Body (raw JSON):
+
+json
+{
+  "email": "admin@smartstock.com",
+  "password": "plaintextpassword"
+}
+
+Save the token from the response
+
+Create Product Request
+Method: POST
+URL: http://localhost:3000/products
+Headers:
+Authorization: Bearer <your_token>
+Content-Type: application/json
+Body (raw JSON):
+
+json
+{
+  "name": "Organic Milk",
+  "sku": "MILK001",
+  "category": "Dairy",
+  "initialStock": 50,
+  "lowStockThreshold": 10,
+  "expiryDate": "2023-12-31",
+  "supplierId": "507f1f77bcf86cd799439011"
+}
+
+Get Products Request
+Method: GET
+URL: http://localhost:3000/products
+Headers:
+Authorization: Bearer <your_token>
+
+Adjust Inventory Request
+Method: PATCH
+URL: http://localhost:3000/inventory/<product_id>/adjust
+Headers:
+Authorization: Bearer <your_token>
+Content-Type: application/json
+
+Body (raw JSON):
+
+json
+{
+  "adjustment": -5,
+  "reason": "sale"
+}
+
+Get Expiry Alerts Request
+Method: GET
+URL: http://localhost:3000/reports/expiry-alerts
+Headers:
+Authorization: Bearer <your_token>
+
+
