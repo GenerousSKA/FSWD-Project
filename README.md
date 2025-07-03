@@ -1157,3 +1157,13 @@ Final Steps: Create .env file
 o	REACT_APP_API_URL=http://localhost:3000
 o	npm start
 
+![SmartStock Login Image](https://github.com/user-attachments/assets/e2cb7dd0-e80d-43c8-ad54-8ad4351a39f3)
+
+
+![SmartStock Dashboard](https://github.com/user-attachments/assets/b8da301f-08a4-4e07-9fe6-351896afb763)
+
+
+![SmartStock Inventory](https://github.com/user-attachments/assets/1a497311-b081-43f8-9b8a-b8e17071366f)
+
+
+![SmartStock Report](https://github.com/user-attachments/assets/ad85ef33-15d0-40fb-a06a-57ee44a0cd16)
